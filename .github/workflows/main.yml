@@ -33,9 +33,7 @@ jobs:
           cd $PROJECT_DIR
           flutter create . --platforms=android
           flutter pub get
-          cd android
-          ./gradlew assembleRelease -Xlint:-deprecation -Xlint:-unchecked
-          cd ..
+          flutter build apk --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
