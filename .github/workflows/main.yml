@@ -27,11 +27,18 @@ jobs:
         with:
           flutter-version: '3.x'
 
-      - name: Build APK
+      - name: Enable Desugaring and Build APK
         run: |
           PROJECT_DIR=$(find . -maxdepth 2 -name "pubspec.yaml" -exec dirname {} \;)
           cd $PROJECT_DIR
           flutter create . --platforms=android
+          
+          GRADLE_FILE="android/app/build.gradle"
+          if [ -f "$GRADLE_FILE" ]; then
+            echo 'android { compileOptions { coreLibraryDesugaringEnabled true } }' >> $GRADLE_FILE
+            echo 'dependencies { coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4" }' >> $GRADLE_FILE
+          fi
+
           flutter pub upgrade --major-versions
           flutter pub get
           flutter build apk --release
