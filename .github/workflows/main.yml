@@ -32,7 +32,7 @@ jobs:
           PROJECT_DIR=$(find . -maxdepth 2 -name "pubspec.yaml" -exec dirname {} \;)
           cd $PROJECT_DIR
           flutter create . --platforms=android
-          flutter pub upgrade flutter_local_notifications
+          flutter pub upgrade --major-versions
           flutter pub get
           flutter build apk --release
 
