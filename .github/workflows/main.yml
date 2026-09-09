@@ -1,3 +1,4 @@
+
 name: Build Flutter APK
 
 on:
@@ -27,17 +28,57 @@ jobs:
         with:
           flutter-version: '3.x'
 
-      - name: Enable Desugaring and Build APK
+      - name: Fix Android Build Configuration and Build APK
         run: |
           PROJECT_DIR=$(find . -maxdepth 2 -name "pubspec.yaml" -exec dirname {} \;)
           cd $PROJECT_DIR
           flutter create . --platforms=android
-          
-          GRADLE_FILE="android/app/build.gradle"
-          if [ -f "$GRADLE_FILE" ]; then
-            echo 'android { compileOptions { coreLibraryDesugaringEnabled true } }' >> $GRADLE_FILE
-            echo 'dependencies { coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4" }' >> $GRADLE_FILE
-          fi
+
+          cat << 'EOF' > android/app/build.gradle
+          plugins {
+              id "com.android.application"
+              id "kotlin-android"
+              id "dev.flutter.flutter-gradle-plugin"
+          }
+
+          android {
+              namespace "com.example.adam_chat"
+              compileSdk 34
+
+              compileOptions {
+                  coreLibraryDesugaringEnabled true
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+
+              kotlinOptions {
+                  jvmTarget = '1.8'
+              }
+
+              defaultConfig {
+                  applicationId "com.example.adam_chat"
+                  minSdk 21
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0.0"
+                  multiDexEnabled true
+              }
+
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.debug
+                  }
+              }
+          }
+
+          flutter {
+              source '../..'
+          }
+
+          dependencies {
+              coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
+          }
+          EOF
 
           flutter pub upgrade --major-versions
           flutter pub get
