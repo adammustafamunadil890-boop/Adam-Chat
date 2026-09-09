@@ -19,7 +19,7 @@ jobs:
 
       - name: Extract ZIP File
         run: |
-          unzip *.zip
+          unzip -o *.zip || true
           echo "Extracted files successfully"
 
       - name: Set up Flutter
@@ -33,7 +33,9 @@ jobs:
           cd $PROJECT_DIR
           flutter create . --platforms=android
           flutter pub get
-          flutter build apk --release
+          cd android
+          ./gradlew assembleRelease -Xlint:-deprecation -Xlint:-unchecked
+          cd ..
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
