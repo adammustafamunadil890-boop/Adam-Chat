@@ -25,21 +25,22 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          flutter-version: '3.29.0'
 
       - name: Inject Configuration and Build APK
         run: |
           PROJECT_DIR=$(find . -maxdepth 2 -name "pubspec.yaml" -exec dirname {} \;)
           cd $PROJECT_DIR
 
-          # 1. Regenerate native Android structure cleanly
+          # Clean and rebuild android platform
+          rm -rf android
           flutter create . --platforms=android --org com.example
 
-          # 2. Fix notification symbol ambiguity with compatible release
+          # Add matching packages
           flutter pub add flutter_local_notifications:18.0.1
+          flutter pub get
 
-          # 3. Inject google-services.json
-          mkdir -p android/app
+          # Inject google-services.json
           cat << 'EOF' > android/app/google-services.json
           {
             "project_info": {
@@ -72,62 +73,15 @@ jobs:
           }
           EOF
 
-          # 4. Add Internet Permissions
+          # Add permissions
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
           sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>' $MANIFEST_FILE
 
-          # 5. Overwrite android/app/build.gradle with compileSdk 36
-          cat << 'EOF' > android/app/build.gradle
-          plugins {
-              id "com.android.application"
-              id "kotlin-android"
-              id "dev.flutter.flutter-gradle-plugin"
-          }
+          # Update compileSdk to 35
+          sed -i 's/flutter.compileSdkVersion/35/g' android/app/build.gradle || true
+          sed -i 's/compileSdk = .*/compileSdk = 35/g' android/app/build.gradle || true
 
-          android {
-              namespace "com.example.adam_chat"
-              compileSdk 36
-
-              compileOptions {
-                  coreLibraryDesugaringEnabled true
-                  sourceCompatibility JavaVersion.VERSION_1_8
-                  targetCompatibility JavaVersion.VERSION_1_8
-              }
-
-              kotlinOptions {
-                  jvmTarget = '1.8'
-              }
-
-              defaultConfig {
-                  applicationId "com.example.adam_chat"
-                  minSdk 21
-                  targetSdk 36
-                  versionCode 1
-                  versionName "1.0.0"
-                  multiDexEnabled true
-              }
-
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.debug
-                  }
-              }
-          }
-
-          flutter {
-              source '../..'
-          }
-
-          dependencies {
-              coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
-          }
-          EOF
-
-          # 6. Force compileSdk 36 globally without breaking Firebase structure
-          echo "android.subprojects.compileSdk=36" >> android/gradle.properties
-
-          # 7. Fetch packages and execute build
-          flutter pub get
+          # Build APK
           flutter build apk --release
 
       - name: Upload APK
