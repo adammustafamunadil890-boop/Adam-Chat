@@ -27,7 +27,7 @@ jobs:
         with:
           flutter-version: '3.29.0'
 
-      - name: Inject Configuration and Fix Main Method
+      - name: Inject Configuration and Build Full App
         run: |
           PROJECT_DIR=$(find . -maxdepth 2 -name "pubspec.yaml" -exec dirname {} \;)
           cd $PROJECT_DIR
@@ -36,44 +36,16 @@ jobs:
           rm -rf android
           flutter create . --platforms=android --org com.example
 
-          # 2. Add dependencies
+          # 2. Add dependencies and resolve packages
           flutter pub add flutter_local_notifications:18.0.1
           flutter pub get
 
-          # 3. Patch lib/main.dart with error handling to avoid splash freezes
+          # 3. Patch lib/main.dart safely without wiping original features
           MAIN_FILE="lib/main.dart"
           if [ -f "$MAIN_FILE" ]; then
-            cat << 'EOF' > $MAIN_FILE
-          import 'package:flutter/material.dart';
-          import 'package:firebase_core/firebase_core.dart';
-
-          void main() async {
-            WidgetsFlutterBinding.ensureInitialized();
-            try {
-              await Firebase.initializeApp().timeout(const Duration(seconds: 5));
-            } catch (e) {
-              debugPrint("Firebase init bypassed: $e");
-            }
-            runApp(const MyApp());
-          }
-
-          class MyApp extends StatelessWidget {
-            const MyApp({super.key});
-            @override
-            Widget build(BuildContext context) {
-              return MaterialApp(
-                home: Scaffold(
-                  body: Center(
-                    child: Text(
-                      'تم فتح التطبيق بنجاح!',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-              );
-            }
-          }
-          EOF
+            if ! grep -q "WidgetsFlutterBinding.ensureInitialized" "$MAIN_FILE"; then
+              sed -i '/void main()/a \  WidgetsFlutterBinding.ensureInitialized();' "$MAIN_FILE"
+            fi
           fi
 
           # 4. Inject google-services.json
@@ -113,7 +85,7 @@ jobs:
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
           sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>' $MANIFEST_FILE
 
-          # 6. Configure build.gradle with MultiDex
+          # 6. Configure build.gradle
           cat << 'EOF' > android/app/build.gradle
           plugins {
               id "com.android.application"
@@ -162,7 +134,7 @@ jobs:
           }
           EOF
 
-          # 7. Build Debug APK
+          # 7. Build Debug APK with full project code
           flutter build apk --debug
 
       - name: Upload APK
