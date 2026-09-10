@@ -32,11 +32,11 @@ jobs:
           PROJECT_DIR=$(find . -maxdepth 2 -name "pubspec.yaml" -exec dirname {} \;)
           cd $PROJECT_DIR
 
-          # Clean and rebuild android platform
+          # Clean and rebuild native Android platform
           rm -rf android
           flutter create . --platforms=android --org com.example
 
-          # Add matching packages
+          # Add dependencies
           flutter pub add flutter_local_notifications:18.0.1
           flutter pub get
 
@@ -73,13 +73,56 @@ jobs:
           }
           EOF
 
-          # Add permissions
+          # Add network permissions
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
           sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>' $MANIFEST_FILE
 
-          # Update compileSdk to 35
-          sed -i 's/flutter.compileSdkVersion/35/g' android/app/build.gradle || true
-          sed -i 's/compileSdk = .*/compileSdk = 35/g' android/app/build.gradle || true
+          # Overwrite build.gradle to enable Core Library Desugaring & compileSdk 35
+          cat << 'EOF' > android/app/build.gradle
+          plugins {
+              id "com.android.application"
+              id "kotlin-android"
+              id "dev.flutter.flutter-gradle-plugin"
+          }
+
+          android {
+              namespace "com.example.adam_chat"
+              compileSdk 35
+
+              compileOptions {
+                  coreLibraryDesugaringEnabled true
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+
+              kotlinOptions {
+                  jvmTarget = '1.8'
+              }
+
+              defaultConfig {
+                  applicationId "com.example.adam_chat"
+                  minSdk 21
+                  targetSdk 35
+                  versionCode 1
+                  versionName "1.0.0"
+                  multiDexEnabled true
+              }
+
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.debug
+                  }
+              }
+          }
+
+          flutter {
+              source '../..'
+          }
+
+          dependencies {
+              coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+          }
+          EOF
 
           # Build APK
           flutter build apk --release
