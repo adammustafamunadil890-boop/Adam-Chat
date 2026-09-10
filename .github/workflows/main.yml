@@ -35,6 +35,9 @@ jobs:
           # Regenerate Android platform
           flutter create . --platforms=android --org com.example
 
+          # Force update conflicting notifications library
+          flutter pub add flutter_local_notifications:^17.2.1
+
           # Inject google-services.json
           mkdir -p android/app
           cat << 'EOF' > android/app/google-services.json
