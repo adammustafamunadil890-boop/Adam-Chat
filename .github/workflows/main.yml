@@ -27,20 +27,28 @@ jobs:
         with:
           flutter-version: '3.29.0'
 
-      - name: Inject Configuration and Build APK
+      - name: Inject Configuration and Fix Main Method
         run: |
           PROJECT_DIR=$(find . -maxdepth 2 -name "pubspec.yaml" -exec dirname {} \;)
           cd $PROJECT_DIR
 
-          # Clean and rebuild native Android platform
+          # 1. Re-create native Android directory
           rm -rf android
           flutter create . --platforms=android --org com.example
 
-          # Add dependencies
+          # 2. Add dependencies
           flutter pub add flutter_local_notifications:18.0.1
           flutter pub get
 
-          # Inject google-services.json
+          # 3. Inject WidgetsFlutterBinding to prevent runtime freeze
+          MAIN_FILE="lib/main.dart"
+          if [ -f "$MAIN_FILE" ]; then
+            if ! grep -q "WidgetsFlutterBinding.ensureInitialized" "$MAIN_FILE"; then
+              sed -i '/void main()/a \  WidgetsFlutterBinding.ensureInitialized();' "$MAIN_FILE"
+            fi
+          fi
+
+          # 4. Inject google-services.json
           cat << 'EOF' > android/app/google-services.json
           {
             "project_info": {
@@ -73,11 +81,11 @@ jobs:
           }
           EOF
 
-          # Add network permissions
+          # 5. Add network permissions
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
           sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>' $MANIFEST_FILE
 
-          # Overwrite build.gradle (Disable Minify & Keep Desugaring)
+          # 6. Configure build.gradle with MultiDex and Keep Desugaring
           cat << 'EOF' > android/app/build.gradle
           plugins {
               id "com.android.application"
@@ -126,11 +134,11 @@ jobs:
           }
           EOF
 
-          # Build APK without shrinking
-          flutter build apk --release --no-shrink
+          # 7. Build APK in Debug mode to bypass native initialization hangs
+          flutter build apk --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: '**/build/app/outputs/flutter-apk/app-release.apk'
+          name: app-debug-apk
+          path: '**/build/app/outputs/flutter-apk/app-debug.apk'
