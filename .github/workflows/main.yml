@@ -27,12 +27,53 @@ jobs:
         with:
           flutter-version: '3.x'
 
-      - name: Fix Android Build Configuration and Build APK
+      - name: Inject Firebase, Permissions & Build APK
         run: |
           PROJECT_DIR=$(find . -maxdepth 2 -name "pubspec.yaml" -exec dirname {} \;)
           cd $PROJECT_DIR
-          flutter create . --platforms=android
 
+          # Regenerate Android platform
+          flutter create . --platforms=android --org com.example
+
+          # Inject Google Services JSON
+          mkdir -p android/app
+          cat << 'EOF' > android/app/google-services.json
+          {
+            "project_info": {
+              "project_number": "599339043109",
+              "project_id": "adam-chat-21b40",
+              "storage_bucket": "adam-chat-21b40.firebasestorage.app"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:599339043109:android:13fe2e65bc7bfed37372cc",
+                  "android_client_info": {
+                    "package_name": "com.example.adam_chat"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  {
+                    "current_key": "AIzaSyDUTfSCfP1LTSOMVj_2684Xpg_H__p_2jo"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+
+          # Inject INTERNET permissions into AndroidManifest
+          MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
+          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>' $MANIFEST_FILE
+
+          # Inject modern App-level build.gradle with Google Services plugin
           cat << 'EOF' > android/app/build.gradle
           plugins {
               id "com.android.application"
@@ -79,7 +120,6 @@ jobs:
           }
           EOF
 
-          flutter pub upgrade --major-versions
           flutter pub get
           flutter build apk --release
 
