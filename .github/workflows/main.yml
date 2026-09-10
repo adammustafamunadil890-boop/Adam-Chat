@@ -27,7 +27,7 @@ jobs:
         with:
           flutter-version: '3.x'
 
-      - name: Inject Firebase, Permissions & Build APK
+      - name: Inject Configuration and Build APK
         run: |
           PROJECT_DIR=$(find . -maxdepth 2 -name "pubspec.yaml" -exec dirname {} \;)
           cd $PROJECT_DIR
@@ -35,7 +35,7 @@ jobs:
           # Regenerate Android platform
           flutter create . --platforms=android --org com.example
 
-          # Inject Google Services JSON
+          # Inject google-services.json
           mkdir -p android/app
           cat << 'EOF' > android/app/google-services.json
           {
@@ -69,11 +69,11 @@ jobs:
           }
           EOF
 
-          # Inject INTERNET permissions into AndroidManifest
+          # Inject Internet Permissions
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
           sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>' $MANIFEST_FILE
 
-          # Inject modern App-level build.gradle with Google Services plugin
+          # Inject modern App-level build.gradle with API 34 Compatibility
           cat << 'EOF' > android/app/build.gradle
           plugins {
               id "com.android.application"
@@ -83,22 +83,22 @@ jobs:
 
           android {
               namespace "com.example.adam_chat"
-              compileSdk 36
+              compileSdk 34
 
               compileOptions {
                   coreLibraryDesugaringEnabled true
-                  sourceCompatibility JavaVersion.VERSION_1_8
-                  targetCompatibility JavaVersion.VERSION_1_8
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
               }
 
               kotlinOptions {
-                  jvmTarget = '1.8'
+                  jvmTarget = '17'
               }
 
               defaultConfig {
                   applicationId "com.example.adam_chat"
                   minSdk 21
-                  targetSdk 36
+                  targetSdk 34
                   versionCode 1
                   versionName "1.0.0"
                   multiDexEnabled true
@@ -120,6 +120,8 @@ jobs:
           }
           EOF
 
+          # Override conflicting dependency version cleanly
+          flutter pub add flutter_local_notifications:17.2.1
           flutter pub get
           flutter build apk --release
 
